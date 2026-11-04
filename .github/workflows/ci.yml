@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Socle — Marqueurs de conflit non résolus
+        run: |
+          echo "Recherche des marqueurs de conflit non résolus..."
+          C1="<<<"
+          C2="<<<"
+          CO="${C1}${C2}<"
+          C3=">>>"
+          C4=">>>"
+          CC="${C3}${C4}>"
+          if grep -rn --exclude-dir=.git -E "^(${CO}|${CC})" .; then
+            echo "ERREUR : Marqueurs de conflit non résolus détectés."
+            exit 1
+          fi
+          echo "Aucun marqueur de conflit trouvé."
+
+      - name: Socle — Marqueur de blocage explicite
+        run: |
+          HOLD="FIXME"
+          HOLD="${HOLD}_BLOCK_CI"
+          echo "Recherche du marqueur de blocage..."
+          if grep -r --exclude-dir=.git -F "$HOLD" .; then
+            echo "ERREUR : Marqueur de blocage détecté ($HOLD)."
+            exit 1
+          fi
+          echo "Aucun marqueur de blocage trouvé."
+
+      - name: Projet — Version de Node épinglée
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Projet — Installation (npm)
+        run: |
+          if [ ! -f package.json ]; then
+            echo "Aucun package.json : rien à installer."
+            exit 0
+          fi
+          if [ -f package-lock.json ]; then
+            echo "package-lock.json présent : npm ci."
+            npm ci
+          else
+            echo "Pas de package-lock.json : npm install."
+            npm install
+          fi
+
+      - name: Projet — Build
+        run: |
+          if [ -f package.json ] && jq -e '.scripts.build' package.json >/dev/null 2>&1; then
+            echo "Script build présent : npm run build."
+            npm run build
+          else
+            echo "Pas de script build (ou pas de package.json) : rien à construire."
+          fi
+
+      - name: Projet — Tests
+        run: |
+          if [ -f package.json ] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
+            echo "Script test présent : npm test."
+            npm test
+          else
+            echo "Pas de script test (ou pas de package.json) : rien à tester."
+          fi
+
+      - name: Projet — Lint
+        run: |
+          if [ -f package.json ] && jq -e '.scripts.lint' package.json >/dev/null 2>&1; then
+            echo "Script lint présent : npm run lint."
+            npm run lint
+          else
+            echo "Pas de script lint (ou pas de package.json) : rien à vérifier."
+          fi
