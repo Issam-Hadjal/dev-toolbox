@@ -49,7 +49,7 @@ describe("TimestampConverter", () => {
 
     fireEvent.click(within(section).getByRole("button", { name: "Maintenant" }));
 
-    expect(within(section).getByLabelText("Horodatage")).toHaveValue(String(now));
+    expect((within(section).getByLabelText("Horodatage") as HTMLInputElement).value).toBe(String(now));
   });
 
   it("converts a valid date into seconds and milliseconds", () => {
