@@ -8,4 +8,10 @@ export type Tool = {
 };
 
 /** Every tool of the toolbox, in the order the home page lists them. */
-export const tools: Tool[] = [];
+export const tools: Tool[] = [
+  {
+    slug: "timestamp",
+    title: "Convertisseur d'horodatage",
+    description: "Convertit un horodatage en date et inversement.",
+  },
+];
