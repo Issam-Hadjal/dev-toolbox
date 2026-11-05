@@ -35,10 +35,10 @@ export default function TimestampConverter() {
   const [dateResult, setDateResult] = useState<TimestampValue | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
 
-  function convertTimestamp(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /** Converts a timestamp value and stores its result or its French error. */
+  function applyTimestamp(value: string) {
     try {
-      setTimestampResult(timestampToDate(timestampInput));
+      setTimestampResult(timestampToDate(value));
       setTimestampError(null);
     } catch (error) {
       setTimestampResult(null);
@@ -46,8 +46,15 @@ export default function TimestampConverter() {
     }
   }
 
+  function convertTimestamp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    applyTimestamp(timestampInput);
+  }
+
   function fillWithNow() {
-    setTimestampInput(String(Date.now()));
+    const now = Date.now();
+    setTimestampInput(String(now));
+    applyTimestamp(String(now));
   }
 
   function convertDate(event: FormEvent<HTMLFormElement>) {
@@ -82,7 +89,11 @@ export default function TimestampConverter() {
                 type="text"
                 inputMode="numeric"
                 value={timestampInput}
-                onChange={(event) => setTimestampInput(event.target.value)}
+                onChange={(event) => {
+                  setTimestampInput(event.target.value);
+                  setTimestampResult(null);
+                  setTimestampError(null);
+                }}
                 placeholder="0"
                 className={inputClass}
               />
@@ -129,7 +140,11 @@ export default function TimestampConverter() {
               id="date"
               type="text"
               value={dateInput}
-              onChange={(event) => setDateInput(event.target.value)}
+              onChange={(event) => {
+                setDateInput(event.target.value);
+                setDateResult(null);
+                setDateError(null);
+              }}
               placeholder="2024-01-01T12:00:00Z"
               className={inputClass}
             />
