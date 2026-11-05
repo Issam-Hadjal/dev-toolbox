@@ -49,12 +49,18 @@ they pass there.
 | Lint | `npm run lint` — `eslint`; `next lint` no longer exists, and `next build` no longer lints |
 | Run locally | `npm run dev` — never needed to publish; stop it before you finish |
 
+The CI chains build, then tests, then lint, and stops at the first failure.
+`next build` also type-checks test files: a test that does not compile breaks
+the build.
+
 ## Conventions
 - A tool's logic lives in `lib/<slug>.ts` as pure functions, tested in
   `lib/<slug>.test.ts`: valid input, edge cases, invalid input. The page only
   wires them to the form.
 - Invalid input shows a message on the page; a tool never throws at the user.
 - The interface speaks French. Code, identifiers and file names are in English.
+- In French JSX text, the apostrophe is the typographic one (’): the straight
+  apostrophe makes the `react/no-unescaped-entities` rule fail.
 - No network: no `fetch` of what the user typed, no analytics, no external
   script, font or image. Everything a tool needs ships with the page.
 - Server Components by default. `'use client'` only where state, effects or
@@ -72,6 +78,11 @@ they pass there.
 - Imports from the repository root use the `@/` alias.
 - Tests sit next to what they test: `<name>.test.ts(x)`. Vitest cannot render an
   async Server Component: test the functions it calls.
+- Assertions use Vitest matchers: `@testing-library/jest-dom` is not installed,
+  so neither `toHaveValue` nor `toBeInTheDocument` is available; read `.value`
+  or `.textContent` instead.
+- `vitest.config.mts` keeps `globals: true`: without it, Testing Library does
+  not clean up the DOM between tests.
 - `next.config.ts` keeps `agentRules: false`: this file, not `next dev`, says how
   to work here.
 
