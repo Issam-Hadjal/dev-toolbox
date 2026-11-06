@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TimestampConverter from "./timestamp-converter";
 
@@ -22,9 +22,65 @@ const PARIS_FORMATTER = new Intl.DateTimeFormat("fr-FR", {
   timeZoneName: "short",
 });
 
+const UTC_VALUE = "1970-01-01T00:00:00.000Z";
+const PARIS_VALUE = PARIS_FORMATTER.format(new Date(0));
+const SECONDS_VALUE = "1";
+const MILLISECONDS_VALUE = "1000";
+
+const COPY_BUTTON_NAMES = {
+  utc: "Copier la date (UTC)",
+  paris: "Copier la date (Paris)",
+  seconds: "Copier les secondes",
+  milliseconds: "Copier les millisecondes",
+} as const;
+
+/** Fills both sections so that the four result lines are displayed. */
+function renderWithResults() {
+  render(<TimestampConverter />);
+
+  const timestamp = timestampSection();
+  fireEvent.change(within(timestamp).getByLabelText("Horodatage"), {
+    target: { value: "0" },
+  });
+  fireEvent.click(within(timestamp).getByRole("button", { name: "Convertir" }));
+
+  const date = dateSection();
+  fireEvent.change(within(date).getByLabelText(/Date/), {
+    target: { value: "1970-01-01T00:00:01Z" },
+  });
+  fireEvent.click(within(date).getByRole("button", { name: "Convertir" }));
+}
+
+/** Installs a fake clipboard on `navigator` and returns its writeText spy. */
+function stubClipboard(writeText: (value: string) => Promise<void>) {
+  const spy = vi.fn(writeText);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: spy },
+    configurable: true,
+  });
+  return spy;
+}
+
+/** Clicks a copy button and lets the clipboard promise settle. */
+async function clickCopyButton(accessibleName: string) {
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: accessibleName }));
+    await Promise.resolve();
+  });
+}
+
+/** Lets the two-second feedback timer elapse. */
+async function waitForFeedbackToExpire() {
+  await act(async () => {
+    vi.advanceTimersByTime(2000);
+  });
+}
+
 describe("TimestampConverter", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
+    Reflect.deleteProperty(navigator, "clipboard");
   });
 
   it("converts a valid timestamp and reports the unit and the UTC date", () => {
@@ -161,5 +217,88 @@ describe("TimestampConverter", () => {
     fireEvent.change(input, { target: { value: "2024-01-01T12:00:00Z" } });
 
     expect(within(section).queryByText(/fuseau horaire/)).toBeNull();
+  });
+
+  it("shows a « Copier » button next to each of the four result values", () => {
+    renderWithResults();
+
+    const expected: Array<[string, string]> = [
+      [COPY_BUTTON_NAMES.utc, UTC_VALUE],
+      [COPY_BUTTON_NAMES.paris, PARIS_VALUE],
+      [COPY_BUTTON_NAMES.seconds, SECONDS_VALUE],
+      [COPY_BUTTON_NAMES.milliseconds, MILLISECONDS_VALUE],
+    ];
+
+    for (const [name, value] of expected) {
+      const button = screen.getByRole("button", { name });
+      expect(button.textContent).toBe("Copier");
+      expect(button.closest("dd")?.textContent ?? "").toContain(value);
+    }
+  });
+
+  it("copies the displayed value of each of the four lines, unchanged", async () => {
+    const writeText = stubClipboard(async () => {});
+    renderWithResults();
+
+    await clickCopyButton(COPY_BUTTON_NAMES.utc);
+    await clickCopyButton(COPY_BUTTON_NAMES.paris);
+    await clickCopyButton(COPY_BUTTON_NAMES.seconds);
+    await clickCopyButton(COPY_BUTTON_NAMES.milliseconds);
+
+    expect(writeText.mock.calls.map(([value]) => value)).toEqual([
+      UTC_VALUE,
+      PARIS_VALUE,
+      SECONDS_VALUE,
+      MILLISECONDS_VALUE,
+    ]);
+  });
+
+  it("shows « Copié » for two seconds after a copy, then « Copier »", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    stubClipboard(async () => {});
+    renderWithResults();
+
+    const utcButton = screen.getByRole("button", {
+      name: COPY_BUTTON_NAMES.utc,
+    });
+    await clickCopyButton(COPY_BUTTON_NAMES.utc);
+
+    expect(utcButton.textContent).toBe("Copié");
+    expect(
+      screen.getByRole("button", { name: COPY_BUTTON_NAMES.paris }).textContent,
+    ).toBe("Copier");
+
+    await waitForFeedbackToExpire();
+
+    expect(utcButton.textContent).toBe("Copier");
+  });
+
+  it("shows « Copie impossible » for two seconds when the copy fails", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    stubClipboard(async () => {
+      throw new Error("presse-papiers refusé");
+    });
+    renderWithResults();
+
+    const parisButton = screen.getByRole("button", {
+      name: COPY_BUTTON_NAMES.paris,
+    });
+    await clickCopyButton(COPY_BUTTON_NAMES.paris);
+
+    expect(parisButton.textContent).toBe("Copie impossible");
+
+    await waitForFeedbackToExpire();
+
+    expect(parisButton.textContent).toBe("Copier");
+  });
+
+  it("shows « Copie impossible » when the clipboard is unavailable", async () => {
+    renderWithResults();
+
+    await clickCopyButton(COPY_BUTTON_NAMES.seconds);
+
+    expect(
+      screen.getByRole("button", { name: COPY_BUTTON_NAMES.seconds }).textContent,
+    ).toBe("Copie impossible");
   });
 });
