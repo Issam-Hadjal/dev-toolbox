@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { dateToTimestamp, timestampToDate } from "@/lib/timestamp";
 import type { TimestampDate, TimestampValue } from "@/lib/timestamp";
@@ -23,6 +23,81 @@ const submitClass =
 const secondaryClass =
   "rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition-colors " +
   "hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600";
+
+const copyClass =
+  "rounded-md border border-zinc-300 px-2 py-1 font-sans text-xs font-medium " +
+  "transition-colors hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600";
+
+type CopyState = "idle" | "copied" | "failed";
+
+/** Visible label of a copy button, per state. */
+const COPY_LABEL: Record<CopyState, string> = {
+  idle: "Copier",
+  copied: "Copié",
+  failed: "Copie impossible",
+};
+
+/** How long the copy feedback stays in place, in milliseconds. */
+const COPY_FEEDBACK_MS = 2000;
+
+interface CopyButtonProps {
+  /** The value written to the clipboard, exactly as displayed on its line. */
+  value: string;
+  /** Accessible name, identical in every state: it says what is copied. */
+  accessibleName: string;
+}
+
+/**
+ * Copies `value` to the clipboard and shows the outcome for two seconds.
+ *
+ * The state is local, so one button never changes another's label. The
+ * accessible name deliberately stays put while the visible label changes:
+ * assistive technology keeps hearing what the button copies.
+ */
+function CopyButton({ value, accessibleName }: CopyButtonProps) {
+  const [state, setState] = useState<CopyState>("idle");
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current !== null) {
+        clearTimeout(resetTimer.current);
+      }
+    };
+  }, []);
+
+  async function copyValue() {
+    if (resetTimer.current !== null) {
+      clearTimeout(resetTimer.current);
+      resetTimer.current = null;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+
+    resetTimer.current = setTimeout(() => {
+      setState("idle");
+      resetTimer.current = null;
+    }, COPY_FEEDBACK_MS);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void copyValue();
+      }}
+      aria-label={accessibleName}
+      className={copyClass}
+    >
+      {COPY_LABEL[state]}
+    </button>
+  );
+}
 
 export default function TimestampConverter() {
   const [timestampInput, setTimestampInput] = useState("");
@@ -115,9 +190,23 @@ export default function TimestampConverter() {
               <dt className="text-zinc-500">Unité</dt>
               <dd>{timestampResult.unit}</dd>
               <dt className="text-zinc-500">Date (UTC)</dt>
-              <dd className="font-mono">{timestampResult.isoUtc}</dd>
+              <dd className="flex items-center gap-2 font-mono">
+                {timestampResult.isoUtc}
+                <CopyButton
+                  key={timestampResult.isoUtc}
+                  value={timestampResult.isoUtc}
+                  accessibleName="Copier la date (UTC)"
+                />
+              </dd>
               <dt className="text-zinc-500">Date (Paris)</dt>
-              <dd className="font-mono">{timestampResult.paris}</dd>
+              <dd className="flex items-center gap-2 font-mono">
+                {timestampResult.paris}
+                <CopyButton
+                  key={timestampResult.paris}
+                  value={timestampResult.paris}
+                  accessibleName="Copier la date (Paris)"
+                />
+              </dd>
             </dl>
           )}
         </form>
@@ -160,9 +249,23 @@ export default function TimestampConverter() {
           {dateResult !== null && (
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
               <dt className="text-zinc-500">Secondes</dt>
-              <dd className="font-mono">{dateResult.seconds}</dd>
+              <dd className="flex items-center gap-2 font-mono">
+                {dateResult.seconds}
+                <CopyButton
+                  key={dateResult.seconds}
+                  value={String(dateResult.seconds)}
+                  accessibleName="Copier les secondes"
+                />
+              </dd>
               <dt className="text-zinc-500">Millisecondes</dt>
-              <dd className="font-mono">{dateResult.milliseconds}</dd>
+              <dd className="flex items-center gap-2 font-mono">
+                {dateResult.milliseconds}
+                <CopyButton
+                  key={dateResult.milliseconds}
+                  value={String(dateResult.milliseconds)}
+                  accessibleName="Copier les millisecondes"
+                />
+              </dd>
             </dl>
           )}
         </form>
