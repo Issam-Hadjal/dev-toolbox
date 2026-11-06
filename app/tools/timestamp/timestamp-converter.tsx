@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { dateToTimestamp, timestampToDate } from "@/lib/timestamp";
-import type { TimestampDate, TimestampValue } from "@/lib/timestamp";
+import { dateToTimestamp, timestampToDate } from "@/lib/timestamp/timestamp";
+import type { TimestampDate, TimestampValue } from "@/lib/timestamp/timestamp";
 
-/** Fallback message: lib/timestamp.ts throws `Error` with a French message. */
+/** Fallback message: lib/timestamp/timestamp.ts throws `Error` with a French message. */
 function messageOf(error: unknown): string {
   return error instanceof Error
     ? error.message

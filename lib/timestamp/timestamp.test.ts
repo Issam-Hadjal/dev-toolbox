@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateToTimestamp, timestampToDate } from "@/lib/timestamp";
+import { dateToTimestamp, timestampToDate } from "@/lib/timestamp/timestamp";
 
 describe("timestampToDate", () => {
   it("reads the input in seconds when its absolute value is below 100 000 000 000", () => {
