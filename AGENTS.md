@@ -30,11 +30,10 @@ by unit tests.
 | `app/tools/<slug>/page.tsx` | one route per tool |
 | `components/` | React components shared between tools |
 | `lib/tools.ts` | the registry: one entry per tool, in the order the home page lists them |
-| `lib/<slug>.ts` | a tool's logic: pure functions, without React or browser APIs |
+| `lib/<slug>/` | a tool's logic and its tests: pure functions, without React or browser APIs |
 | `public/` | static files, served as they are |
 
-Adding a tool takes three pieces, in one pull request: its logic and tests in
-`lib/`, its page in `app/tools/<slug>/`, and its entry in `lib/tools.ts`.
+Adding a tool takes three pieces, in one pull request: its logic and tests in `lib/<slug>/`, its page in `app/tools/<slug>/`, and its entry in `lib/tools.ts`.
 `lib/tools.test.ts` checks that every entry has a page.
 
 ## Commands
@@ -54,9 +53,7 @@ The CI chains build, then tests, then lint, and stops at the first failure.
 the build.
 
 ## Conventions
-- A tool's logic lives in `lib/<slug>.ts` as pure functions, tested in
-  `lib/<slug>.test.ts`: valid input, edge cases, invalid input. The page only
-  wires them to the form.
+- A tool's logic lives in `lib/<slug>/<slug>.ts` as pure functions, tested in `lib/<slug>/<slug>.test.ts`: valid input, edge cases, invalid input. When it grows, split it by subject inside `lib/<slug>/`, each file with its own test. The page only wires them to the form.
 - Invalid input shows a message on the page; a tool never throws at the user.
 - The interface speaks French. Code, identifiers and file names are in English.
 - In French JSX text, the apostrophe is the typographic one (’): the straight
