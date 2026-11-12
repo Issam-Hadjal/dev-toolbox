@@ -42,8 +42,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          # Cache des paquets npm, seulement quand package-lock.json existe :
+          # sans lui, setup-node échouerait au lieu de continuer.
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Projet — Cache de construction Next.js
+        if: hashFiles('next.config.*') != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          # Nouveau cache quand les paquets ou les sources changent ; sinon, reprise du précédent.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
 
       - name: Projet — Installation (npm)
+        id: installation
         run: |
           if [ ! -f package.json ]; then
             echo "Aucun package.json : rien à installer."
@@ -66,7 +80,10 @@ jobs:
             echo "Pas de script build (ou pas de package.json) : rien à construire."
           fi
 
+      # Tests et lint passent même si le build échoue : un seul passage de CI donne
+      # toutes les erreurs. Jamais sans installation réussie, jamais après une annulation.
       - name: Projet — Tests
+        if: ${{ !cancelled() && steps.installation.outcome == 'success' }}
         run: |
           if [ -f package.json ] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
             echo "Script test présent : npm test."
@@ -76,6 +93,7 @@ jobs:
           fi
 
       - name: Projet — Lint
+        if: ${{ !cancelled() && steps.installation.outcome == 'success' }}
         run: |
           if [ -f package.json ] && jq -e '.scripts.lint' package.json >/dev/null 2>&1; then
             echo "Script lint présent : npm run lint."
