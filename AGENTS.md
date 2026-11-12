@@ -48,7 +48,7 @@ they pass there.
 | Lint | `npm run lint` — `eslint`; `next lint` no longer exists, and `next build` no longer lints |
 | Run locally | `npm run dev` — never needed to publish; stop it before you finish |
 
-The CI chains build, then tests, then lint, and stops at the first failure.
+The CI runs install first, then build; tests and lint still run when the build fails, as long as install succeeded.
 `next build` also type-checks test files: a test that does not compile breaks
 the build.
 
