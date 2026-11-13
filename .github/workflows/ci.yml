@@ -6,11 +6,19 @@ on:
   push:
     branches: [dev]
 
+# Le jeton du workflow lit le dépôt, rien de plus : les scripts des paquets
+# installés tournent dans ce job.
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # Aucune étape ne pousse : le jeton ne reste pas dans la configuration git.
+          persist-credentials: false
 
       - name: Socle — Marqueurs de conflit non résolus
         run: |
@@ -39,16 +47,20 @@ jobs:
           echo "Aucun marqueur de blocage trouvé."
 
       - name: Projet — Version de Node épinglée
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          # La version de .nvmrc quand le projet en a une, sinon 24.
+          node-version: ${{ hashFiles('.nvmrc') == '' && '24' || '' }}
+          node-version-file: ${{ hashFiles('.nvmrc') != '' && '.nvmrc' || '' }}
           # Cache des paquets npm, seulement quand package-lock.json existe :
           # sans lui, setup-node échouerait au lieu de continuer.
           cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          # Pas de cache automatique : la ligne du dessus décide seule.
+          package-manager-cache: false
 
       - name: Projet — Cache de construction Next.js
         if: hashFiles('next.config.*') != ''
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/.next/cache
           # Nouveau cache quand les paquets ou les sources changent ; sinon, reprise du précédent.
@@ -72,6 +84,7 @@ jobs:
           fi
 
       - name: Projet — Build
+        id: build
         run: |
           if [ -f package.json ] && jq -e '.scripts.build' package.json >/dev/null 2>&1; then
             echo "Script build présent : npm run build."
@@ -100,4 +113,21 @@ jobs:
             npm run lint
           else
             echo "Pas de script lint (ou pas de package.json) : rien à vérifier."
+          fi
+
+      # Tests de bout en bout et d'accessibilité (Playwright et axe), quand le projet en a.
+      # Ils tournent sur la construction de production : jamais après un build en échec.
+      - name: Projet — Navigateur des tests de bout en bout
+        id: navigateur
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && hashFiles('playwright.config.*') != '' }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Projet — Tests de bout en bout et accessibilité
+        if: ${{ !cancelled() && steps.navigateur.outcome == 'success' }}
+        run: |
+          if jq -e '.scripts["test:e2e"]' package.json >/dev/null 2>&1; then
+            echo "Script test:e2e présent : npm run test:e2e."
+            npm run test:e2e
+          else
+            echo "Pas de script test:e2e : rien à lancer."
           fi
